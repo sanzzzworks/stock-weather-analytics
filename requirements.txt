@@ -1,0 +1,25 @@
+# Data Processing
+pandas
+numpy
+
+# API Calls
+requests
+python-dotenv
+
+# Database
+psycopg2-binary
+SQLAlchemy
+
+# Data Validation
+great-expectations
+
+# Visualization
+matplotlib
+plotly
+
+# Utilities
+python-dateutil
+pytz
+
+# Jupyter
+jupyter
