@@ -1,0 +1,35 @@
+[
+  {
+    "timestamp": "2026-09-19 18:07:50.721251",
+    "city": "Mumbai",
+    "temperature": 29.99,
+    "feels_like": 35.01,
+    "humidity": 70,
+    "pressure": 1010,
+    "wind_speed": 6.17,
+    "cloudiness": 17,
+    "description": "light rain"
+  },
+  {
+    "timestamp": "2026-09-19 18:07:53.114640",
+    "city": "Delhi",
+    "temperature": 32.96,
+    "feels_like": 37.72,
+    "humidity": 55,
+    "pressure": 1009,
+    "wind_speed": 2.06,
+    "cloudiness": 5,
+    "description": "clear sky"
+  },
+  {
+    "timestamp": "2026-09-19 18:07:55.438387",
+    "city": "Bangalore",
+    "temperature": 29.73,
+    "feels_like": 31.44,
+    "humidity": 55,
+    "pressure": 1010,
+    "wind_speed": 3.09,
+    "cloudiness": 99,
+    "description": "overcast clouds"
+  }
+]
