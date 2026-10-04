@@ -207,25 +207,146 @@ class DataCleaner:
         return df
 
 
+# class CorrelationAnalysis:
+#     """Find relationships between weather and stocks"""
+
+#     @staticmethod
+#     def calculate_correlation(
+#         stock_prices,
+#         weather_data,
+#         city='Mumbai'
+#     ):
+#         """
+#         Calculate correlation between weather and stock prices
+
+#         Args:
+#             stock_prices: DataFrame with stock prices
+#             weather_data: DataFrame with weather data
+#             city: Target city
+
+#         Returns:
+#             dict: Correlation metrics
+#         """
+
+#         print(
+#             f"\n📊 Analyzing correlation: "
+#             f"{city} weather vs stocks..."
+#         )
+
+#         # Filter data for specific city
+#         city_weather = weather_data[
+#             weather_data['city'] == city
+#         ].copy()
+
+#         # Merge weather and stock data by date
+#         city_weather['date'] = (
+#             city_weather['recorded_date']
+#         )
+
+#         stock_prices['date'] = pd.to_datetime(
+#             stock_prices['date']
+#         ).dt.date
+
+#         merged = stock_prices.merge(
+#             city_weather,
+#             on='date',
+#             how='inner'
+#         )
+
+#         if len(merged) < 5:
+#             print(
+#                 "⚠️ Not enough data points "
+#                 "for correlation"
+#             )
+#             return None
+
+#         print(
+#             f"📈 Sample size: {len(merged)} days"
+#         )
+
+#         # Calculate Pearson correlation
+#         correlations = {
+#             'temp_vs_close': stats.pearsonr(
+#                 merged['temperature'],
+#                 merged['close']
+#             )[0],
+
+#             'humidity_vs_volume': stats.pearsonr(
+#                 merged['humidity'],
+#                 merged['volume']
+#             )[0],
+
+#             'wind_vs_volatility': stats.pearsonr(
+#                 merged['wind_speed'],
+#                 merged['close'].pct_change()
+#             )[0]
+#         }
+
+#         return {
+#             'city': city,
+#             'symbol': stock_prices['symbol'].iloc[0],
+#             'sample_size': len(merged),
+#             'correlations': correlations,
+#             'interpretation':
+#                 CorrelationAnalysis.interpret_correlation(
+#                     correlations
+#                 )
+#         }
+
+#     @staticmethod
+#     def interpret_correlation(correlations):
+#         """
+#         Interpret correlation values
+
+#         -1 to 1 scale:
+#         -1: Perfect negative
+#         0: No relationship
+#         1: Perfect positive
+#         """
+
+#         findings = []
+
+#         for metric, value in correlations.items():
+
+#             if value > 0.5:
+#                 strength = "Strong positive"
+
+#             elif value > 0.2:
+#                 strength = "Weak positive"
+
+#             elif value < -0.5:
+#                 strength = "Strong negative"
+
+#             elif value < -0.2:
+#                 strength = "Weak negative"
+
+#             else:
+#                 strength = "No relationship"
+
+#             findings.append(
+#                 f"{metric}: {strength} ({value:.3f})"
+#             )
+
+#         return findings
 class CorrelationAnalysis:
-    """Find relationships between weather and stocks"""
+    """Analyze relationships between weather conditions and stock metrics."""
 
     @staticmethod
-    def calculate_correlation(
-        stock_prices,
-        weather_data,
-        city='Mumbai'
-    ):
+    def calculate_correlation(stock_prices, weather_data, city='Mumbai'):
         """
-        Calculate correlation between weather and stock prices
+        Calculate Pearson correlations between weather variables
+        and stock performance metrics.
 
-        Args:
-            stock_prices: DataFrame with stock prices
-            weather_data: DataFrame with weather data
-            city: Target city
+        Stock metrics:
+        - Daily return (%)
+        - Trading volume
+        - Volatility (%)
 
-        Returns:
-            dict: Correlation metrics
+        Weather metrics:
+        - Temperature
+        - Humidity
+        - Wind speed
+        - Weather stress index
         """
 
         print(
@@ -233,19 +354,35 @@ class CorrelationAnalysis:
             f"{city} weather vs stocks..."
         )
 
-        # Filter data for specific city
+        # ---------------------------------------------
+        # 1. Filter weather for selected city
+        # ---------------------------------------------
+
         city_weather = weather_data[
             weather_data['city'] == city
         ].copy()
 
-        # Merge weather and stock data by date
-        city_weather['date'] = (
+        if city_weather.empty:
+            print(f"⚠️ No weather data found for {city}")
+            return None
+
+        # ---------------------------------------------
+        # 2. Prepare dates
+        # ---------------------------------------------
+
+        city_weather['date'] = pd.to_datetime(
             city_weather['recorded_date']
-        )
+        ).dt.date
+
+        stock_prices = stock_prices.copy()
 
         stock_prices['date'] = pd.to_datetime(
             stock_prices['date']
         ).dt.date
+
+        # ---------------------------------------------
+        # 3. Merge stock + weather by date
+        # ---------------------------------------------
 
         merged = stock_prices.merge(
             city_weather,
@@ -255,7 +392,7 @@ class CorrelationAnalysis:
 
         if len(merged) < 5:
             print(
-                "⚠️ Not enough data points "
+                "⚠️ Not enough overlapping data points "
                 "for correlation"
             )
             return None
@@ -264,71 +401,216 @@ class CorrelationAnalysis:
             f"📈 Sample size: {len(merged)} days"
         )
 
-        # Calculate Pearson correlation
-        correlations = {
-            'temp_vs_close': stats.pearsonr(
-                merged['temperature'],
-                merged['close']
-            )[0],
+        # ---------------------------------------------
+        # 4. Ensure required metrics exist
+        # ---------------------------------------------
 
-            'humidity_vs_volume': stats.pearsonr(
-                merged['humidity'],
-                merged['volume']
-            )[0],
+        required_columns = [
+            'temperature',
+            'humidity',
+            'wind_speed',
+            'weather_stress_index',
+            'price_change_percent',
+            'volume',
+            'volatility'
+        ]
 
-            'wind_vs_volatility': stats.pearsonr(
-                merged['wind_speed'],
-                merged['close'].pct_change()
+        missing = [
+            column
+            for column in required_columns
+            if column not in merged.columns
+        ]
+
+        if missing:
+            raise ValueError(
+                f"Missing columns for correlation: {missing}"
+            )
+
+        # ---------------------------------------------
+        # 5. Remove rows with missing correlation values
+        # ---------------------------------------------
+
+        correlation_data = merged[
+            required_columns
+        ].dropna()
+
+        if len(correlation_data) < 5:
+            print(
+                "⚠️ Not enough complete observations "
+                "for correlation"
+            )
+            return None
+
+        sample_size = len(correlation_data)
+
+        print(
+            f"📊 Complete correlation sample: "
+            f"{sample_size} days"
+        )
+
+        # ---------------------------------------------
+        # 6. Calculate Pearson correlations
+        # ---------------------------------------------
+
+        def pearson_correlation(x, y):
+            """
+            Safely calculate Pearson correlation.
+
+            PostgreSQL DECIMAL values may be loaded into pandas
+            as object/Decimal values, so convert them to numeric
+            NumPy arrays before passing them to scipy.
+            """
+
+            x_numeric = pd.to_numeric(
+                x,
+                errors='coerce'
+            )
+
+            y_numeric = pd.to_numeric(
+                y,
+                errors='coerce'
+            )
+
+            valid = (
+                x_numeric.notna()
+                & y_numeric.notna()
+            )
+
+            x_numeric = x_numeric[valid].to_numpy(
+                dtype=float
+            )
+
+            y_numeric = y_numeric[valid].to_numpy(
+                dtype=float
+            )
+
+            if len(x_numeric) < 5:
+                return np.nan
+
+            if np.unique(x_numeric).size < 2:
+                return np.nan
+
+            if np.unique(y_numeric).size < 2:
+                return np.nan
+
+            return stats.pearsonr(
+                x_numeric,
+                y_numeric
             )[0]
+
+        correlations = {
+
+            # Weather → daily stock return
+            'temperature_vs_return':
+                pearson_correlation(
+                    correlation_data['temperature'],
+                    correlation_data['price_change_percent']
+                ),
+
+            'humidity_vs_return':
+                pearson_correlation(
+                    correlation_data['humidity'],
+                    correlation_data['price_change_percent']
+                ),
+
+            'wind_vs_return':
+                pearson_correlation(
+                    correlation_data['wind_speed'],
+                    correlation_data['price_change_percent']
+                ),
+
+            # Weather → trading volume
+            'temperature_vs_volume':
+                pearson_correlation(
+                    correlation_data['temperature'],
+                    correlation_data['volume']
+                ),
+
+            'humidity_vs_volume':
+                pearson_correlation(
+                    correlation_data['humidity'],
+                    correlation_data['volume']
+                ),
+
+            # Weather → stock volatility
+            'temperature_vs_volatility':
+                pearson_correlation(
+                    correlation_data['temperature'],
+                    correlation_data['volatility']
+                ),
+
+            'humidity_vs_volatility':
+                pearson_correlation(
+                    correlation_data['humidity'],
+                    correlation_data['volatility']
+                ),
+
+            'wind_vs_volatility':
+                pearson_correlation(
+                    correlation_data['wind_speed'],
+                    correlation_data['volatility']
+                ),
+
+            'weather_stress_vs_volatility':
+                pearson_correlation(
+                    correlation_data['weather_stress_index'],
+                    correlation_data['volatility']
+                )
         }
 
         return {
             'city': city,
             'symbol': stock_prices['symbol'].iloc[0],
-            'sample_size': len(merged),
+            'sample_size': sample_size,
             'correlations': correlations,
-            'interpretation':
-                CorrelationAnalysis.interpret_correlation(
-                    correlations
-                )
+            'interpretation': CorrelationAnalysis.interpret_correlation(
+                correlations
+            )
         }
 
     @staticmethod
     def interpret_correlation(correlations):
         """
-        Interpret correlation values
+        Provide descriptive interpretation of Pearson r.
 
-        -1 to 1 scale:
-        -1: Perfect negative
-        0: No relationship
-        1: Perfect positive
+        Note:
+        These labels describe correlation strength only.
+        They do not imply causation.
         """
 
         findings = []
 
         for metric, value in correlations.items():
 
-            if value > 0.5:
+            if pd.isna(value):
+                strength = "Undefined"
+
+            elif value >= 0.5:
                 strength = "Strong positive"
 
-            elif value > 0.2:
+            elif value >= 0.2:
                 strength = "Weak positive"
 
-            elif value < -0.5:
+            elif value <= -0.5:
                 strength = "Strong negative"
 
-            elif value < -0.2:
+            elif value <= -0.2:
                 strength = "Weak negative"
 
             else:
-                strength = "No relationship"
+                strength = "Very weak / near zero"
 
-            findings.append(
-                f"{metric}: {strength} ({value:.3f})"
-            )
+            if pd.isna(value):
+                findings.append(
+                    f"{metric}: {strength}"
+                )
+            else:
+                findings.append(
+                    f"{metric}: "
+                    f"{strength} ({value:.3f})"
+                )
 
         return findings
-
 
 # ============== EXAMPLE USAGE ==============
 

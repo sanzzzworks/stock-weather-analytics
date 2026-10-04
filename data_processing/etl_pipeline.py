@@ -222,36 +222,102 @@ class ETLPipeline:
             self.logger.error(f"❌ Correlation analysis failed: {e}")
             raise
     
+    # def save_correlation_result(self, result):
+    #     """Save correlation analysis to database"""
+        
+    #     findings_text = '\n'.join(result['interpretation'])
+        
+    #     query = """
+    #         INSERT INTO correlation_analysis 
+    #         (symbol, city, analysis_date, correlation_coefficient, 
+    #          sample_size, analysis_type, findings)
+    #         VALUES (%s, %s, %s, %s, %s, %s, %s)
+    #         ON CONFLICT DO NOTHING
+    #     """
+        
+    #     try:
+    #         with self.db.cursor() as cur:
+    #             cur.execute(query, (
+    #                 result['symbol'],
+    #                 result['city'],
+    #                 datetime.now().date(),
+    #                 str(result['correlations']),  # Store as string
+    #                 result['sample_size'],
+    #                 'weather_stock_correlation',
+    #                 findings_text
+    #             ))
+            
+    #         self.logger.info("✅ Correlation result saved to database")
+        
+    #     except Exception as e:
+    #         self.logger.error(f"❌ Failed to save correlation: {e}")
+    
     def save_correlation_result(self, result):
-        """Save correlation analysis to database"""
-        
-        findings_text = '\n'.join(result['interpretation'])
-        
+        """Save individual correlation metrics to database."""
+
         query = """
-            INSERT INTO correlation_analysis 
-            (symbol, city, analysis_date, correlation_coefficient, 
-             sample_size, analysis_type, findings)
+            INSERT INTO correlation_analysis
+            (
+                symbol,
+                city,
+                analysis_date,
+                correlation_coefficient,
+                sample_size,
+                analysis_type,
+                findings
+            )
             VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT DO NOTHING
+            ON CONFLICT (symbol, city, analysis_date, analysis_type)
+            DO UPDATE SET
+                correlation_coefficient = EXCLUDED.correlation_coefficient,
+                sample_size = EXCLUDED.sample_size,
+                findings = EXCLUDED.findings;
         """
-        
+
         try:
             with self.db.cursor() as cur:
-                cur.execute(query, (
-                    result['symbol'],
-                    result['city'],
-                    datetime.now().date(),
-                    str(result['correlations']),  # Store as string
-                    result['sample_size'],
-                    'weather_stock_correlation',
-                    findings_text
-                ))
-            
-            self.logger.info("✅ Correlation result saved to database")
-        
+
+                for metric, coefficient in result['correlations'].items():
+
+                    # Convert NumPy values to normal Python float
+                    if pd.isna(coefficient):
+                        coefficient = None
+                    else:
+                        coefficient = float(coefficient)
+
+                    # Find matching interpretation
+                    finding = next(
+                        (
+                            item
+                            for item in result['interpretation']
+                            if item.startswith(metric + ":")
+                        ),
+                        metric
+                    )
+
+                    cur.execute(
+                        query,
+                        (
+                            result['symbol'],
+                            result['city'],
+                            datetime.now().date(),
+                            coefficient,
+                            result['sample_size'],
+                            metric,
+                            finding
+                        )
+                    )
+
+            self.logger.info(
+                f"✅ Saved {len(result['correlations'])} correlation metrics"
+            )
+
         except Exception as e:
-            self.logger.error(f"❌ Failed to save correlation: {e}")
-    
+            self.logger.error(
+                f"❌ Failed to save correlations: {e}"
+            )
+            raise
+
     def run_full_pipeline(self):
         """
         Run complete ETL pipeline
